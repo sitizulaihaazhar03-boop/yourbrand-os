@@ -1,0 +1,21 @@
+name: Scheduled jobs
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+jobs:
+  call:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call endpoints
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          call() { curl -fsS -X POST "$APP_URL$1" -H "Authorization: Bearer $CRON_SECRET"; echo; }
+          call /api/push/send
+          M=$(date -u +%M); H=$(date -u +%H)
+          if [ $((10#$M % 15)) -lt 5 ]; then call /api/agents/run; call /api/agents/poll; fi
+          if [ $((10#$M)) -lt 5 ]; then call /api/finance/receipt-cleanup; fi
+          if [ "$H" = "19" ] && [ $((10#$M)) -lt 5 ]; then call /api/maintenance/sweep-files; call /api/hire/cv-cleanup; fi
+          if [ "$H" = "02" ] && [ $((10#$M)) -lt 5 ]; then call /api/finance/fx-rates/fetch; fi
